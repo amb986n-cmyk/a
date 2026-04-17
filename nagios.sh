@@ -30,7 +30,7 @@ cd nagioscore-nagios-4.4.13/ || exit
 msg "Configurando compilación..."
 run "./configure --with-httpd-conf=/etc/apache2/sites-enabled"
 run "make all"
-run "make install-group-users"
+run "make install-groups-users"
 run "usermod -a -G nagios www-data"
 run "make install"
 run "make install-daemoninit"
