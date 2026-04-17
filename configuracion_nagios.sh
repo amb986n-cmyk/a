@@ -62,5 +62,21 @@ EOF
  grep -q '^enable_notifications=1' "$CFG" || echo 'enable_notifications=1' >> "$CFG"; ok 'Correo configurado'; }
 time_fix(){ timedatectl set-timezone Europe/Madrid; timedatectl set-ntp true; ok 'Hora ajustada'; }
 del_host(){ read -p 'Host a borrar: ' H; sed -i "/host_name $H/,+12d" "$HOSTS"; ok 'Host borrado'; }
-cleanup(){ echo '' > "$HOSTS"; sed -i '/check_nrpe/,+3d' "$CMDS"; sed -i '/contact_name admin/,+8d' "$CONTACTS"; sed -i '/enable_notifications=1/d' "$CFG"; grep -q 'objects/hosts.cfg' "$CFG" || echo 'cfg_file=/usr/local/nagios/etc/objects/hosts.cfg' >> "$CFG"; verify; systemctl restart nagios; ok 'Limpieza total completada'; }
+cleanup(){
+ mkdir -p /tmp/nagios_backup
+ cp "$CMDS" /tmp/nagios_backup/commands.cfg.bak 2>/dev/null
+ cp "$HOSTS" /tmp/nagios_backup/hosts.cfg.bak 2>/dev/null
+ cp "$CONTACTS" /tmp/nagios_backup/contacts.cfg.bak 2>/dev/null
+ echo '' > "$HOSTS"
+ sed -i '/check_nrpe/,+5d' "$CMDS"
+ sed -i '/contact_name admin/,+8d' "$CONTACTS"
+ sed -i '/enable_notifications=1/d' "$CFG"
+ grep -q 'objects/hosts.cfg' "$CFG" || echo 'cfg_file=/usr/local/nagios/etc/objects/hosts.cfg' >> "$CFG"
+ if ! /usr/local/nagios/bin/nagios -v "$CFG" >/dev/null 2>&1; then
+   cp /tmp/nagios_backup/commands.cfg.bak "$CMDS" 2>/dev/null
+   sed -i '/check_nrpe/,+5d' "$CMDS"
+ fi
+ /usr/local/nagios/bin/nagios -v "$CFG"
+ systemctl restart nagios
+ ok 'Limpieza total completada y saneada'; }
 while true; do echo '===== NAGIOS MONITOR PRO V3 ====='; echo '1 Añadir host'; echo '2 Preparar servidor NRPE'; echo '3 Instalar cliente NRPE SSH'; echo '4 Añadir checks'; echo '5 Alertas correo'; echo '6 Ajustar hora'; echo '7 Verificar'; echo '8 Reiniciar'; echo '9 Eliminar host'; echo '10 Limpieza total'; echo '11 Salir'; read -p 'Opción: ' op; case "$op" in 1)add_host;;2)prep_nrpe;;3)ssh_client;;4)add_checks;;5)mail_alert;;6)time_fix;;7)verify;;8)restart_n;;9)del_host;;10)cleanup;;11)exit;;*)warn 'Inválido';; esac; read -p 'ENTER...'; clear; done
