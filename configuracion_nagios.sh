@@ -9,6 +9,7 @@ ok(){ echo -e "${GREEN}✔ $1${NC}"; }
 fail(){ echo -e "${RED}✘ $1${NC}"; exit 1; }
 run(){ msg "$1"; eval "$1" || fail "Error: $1"; }
 CFG=/usr/local/nagios/etc/nagios.cfg
+ensure_include(){ grep -q 'objects/hosts.cfg' $CFG || echo 'cfg_file=/usr/local/nagios/etc/objects/hosts.cfg' >> $CFG; }
 HOSTS=/usr/local/nagios/etc/objects/hosts.cfg
 CMDS=/usr/local/nagios/etc/objects/commands.cfg
 CONTACTS=/usr/local/nagios/etc/objects/contacts.cfg
@@ -27,6 +28,7 @@ menu(){
  read -p 'Opción: ' op
 }
 add_host(){
+ ensure_include
  read -p 'Host name: ' HN; read -p 'Alias: ' AL; read -p 'IP: ' IP
 cat >> $HOSTS <<EOF
 
@@ -154,7 +156,8 @@ EOF
 ok 'Alertas configuradas'
 }
 time_fix(){ run 'timedatectl set-timezone Europe/Madrid'; run 'timedatectl set-ntp true'; }
-verify(){ run '/usr/local/nagios/bin/nagios -v /usr/local/nagios/etc/nagios.cfg'; }
+verify(){
+ ensure_include run '/usr/local/nagios/bin/nagios -v /usr/local/nagios/etc/nagios.cfg'; }
 restart_n(){ run 'systemctl restart nagios'; }
 del_host(){ read -p 'Host a borrar: ' HN; sed -i "/host_name[[:space:]]*$HN/,+6d" $HOSTS; ok 'Revisa services relacionados manualmente'; }
 while true; do menu; case $op in 1) add_host;;2) prep_nrpe;;3) client_nrpe;;4) add_checks;;5) mail_alert;;6) time_fix;;7) verify;;8) restart_n;;9) del_host;;10) exit;;*) echo 'Inválido';; esac; read -p 'ENTER...'; clear; done
