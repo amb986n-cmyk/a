@@ -15,9 +15,8 @@ menu(){
  echo -e "${GREEN}      NAGIOS INSTALLER        ${NC}"
  echo -e "${GREEN}==============================${NC}"
  echo "1) Instalar Nagios"
- echo "2) Reparar Apache/Login"
- echo "3) Desinstalar Nagios"
- echo "4) Salir"
+ echo "2) Desinstalar Nagios"
+ echo "3) Salir"
  read -p 'Opción: ' op
 }
 install_nagios(){
@@ -58,12 +57,6 @@ install_nagios(){
  echo "URL: http://$IP/nagios"
  echo "Usuario: $USERNAME"
 }
-repair(){
- run "a2enmod cgi rewrite auth_basic authn_file"
- run "a2enconf nagios"
- run "systemctl restart apache2"
- warn "Si falla login, recrea usuario con: sudo htpasswd /usr/local/nagios/etc/htpasswd.users nagiosadmin"
-}
 uninstall_nagios(){
  read -p "¿Seguro? (s/n): " r; [ "$r" != "s" ] && return
  run "systemctl stop nagios 2>/dev/null || true"
@@ -74,4 +67,4 @@ uninstall_nagios(){
  run "systemctl restart apache2"
  ok "Nagios eliminado"
 }
-while true; do menu; case $op in 1) install_nagios;; 2) repair;; 3) uninstall_nagios;; 4) exit;; *) warn "Opción inválida";; esac; read -p 'ENTER para volver al menú...'; clear; done
+while true; do menu; case $op in 1) install_nagios;; 2) uninstall_nagios;; 3) exit;; *) warn "Opción inválida";; esac; read -p 'ENTER para volver al menú...'; clear; done
