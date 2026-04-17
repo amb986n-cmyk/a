@@ -28,7 +28,12 @@ define service {
 }
 EOF
 ok 'Host añadido'; }
-prep_nrpe(){ grep -q 'check_nrpe' "$CMDS" || cat >> "$CMDS" <<EOF
+fix_commands(){
+ sed -i '/^define command{$/d' "$CMDS"
+ sed -i '/^define command{$/N;/\n$/d' "$CMDS"
+}
+prep_nrpe(){
+ fix_commands; grep -q 'check_nrpe' "$CMDS" || cat >> "$CMDS" <<EOF
 
 define command{
  command_name check_nrpe
@@ -63,6 +68,7 @@ EOF
 time_fix(){ timedatectl set-timezone Europe/Madrid; timedatectl set-ntp true; ok 'Hora ajustada'; }
 del_host(){ read -p 'Host a borrar: ' H; sed -i "/host_name $H/,+12d" "$HOSTS"; ok 'Host borrado'; }
 cleanup(){
+ fix_commands;
  mkdir -p /tmp/nagios_backup
  cp "$CMDS" /tmp/nagios_backup/commands.cfg.bak 2>/dev/null
  cp "$HOSTS" /tmp/nagios_backup/hosts.cfg.bak 2>/dev/null
