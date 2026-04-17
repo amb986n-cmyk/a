@@ -50,16 +50,20 @@ EOF
 ok 'Host añadido'
 }
 prep_nrpe(){
- grep -q 'command_name    check_nrpe' $CMDS || cat >> $CMDS <<EOF
+ cp $CMDS ${CMDS}.bak.$(date +%s)
+ if ! grep -q 'command_name[[:space:]]*check_nrpe' $CMDS; then
+ cat >> $CMDS <<EOF
 
 define command{
- command_name check_nrpe
- command_line \$USER1\$/check_nrpe -H \$HOSTADDRESS\$ -c \$ARG1\$
+    command_name    check_nrpe
+    command_line    \$USER1\$/check_nrpe -H \$HOSTADDRESS\$ -c \$ARG1\$
 }
 EOF
-run 'apt install -y nagios-nrpe-plugin'
-run 'cp /usr/lib/nagios/plugins/check_nrpe /usr/local/nagios/libexec/'
-ok 'Servidor preparado'
+ fi
+ run 'apt install -y nagios-nrpe-plugin'
+ run 'cp /usr/lib/nagios/plugins/check_nrpe /usr/local/nagios/libexec/'
+ ok 'Servidor preparado'
+}
 }
 client_nrpe(){
  read -p 'IP cliente: ' CIP; read -p 'Usuario SSH: ' USR; read -p 'IP servidor Nagios: ' SIP
