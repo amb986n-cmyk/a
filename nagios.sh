@@ -12,7 +12,7 @@ run(){ msg "$1"; eval "$1" || fail "Error ejecutando: $1"; }
 bar(){ for i in {1..25}; do echo -ne "${CYAN}#${NC}"; sleep 0.03; done; echo; }
 menu(){
  echo -e "${GREEN}==============================${NC}"
- echo -e "${GREEN}      NAGIOS PRO INSTALLER    ${NC}"
+ echo -e "${GREEN}      NAGIOS INSTALLER        ${NC}"
  echo -e "${GREEN}==============================${NC}"
  echo "1) Instalar Nagios"
  echo "2) Reparar Apache/Login"
