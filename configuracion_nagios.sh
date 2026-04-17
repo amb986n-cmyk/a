@@ -173,4 +173,22 @@ cleanup_all(){
  systemctl restart nagios 2>/dev/null
  ok 'Limpieza completada'
 }
-while true; do menu; case $op in 1) add_host;;2) prep_nrpe;;3) client_nrpe;;4) add_checks;;5) mail_alert;;6) time_fix;;7) verify;;8) restart_n;;9) del_host;;10) cleanup_all;;11) exit;;*) echo 'Inválido';; esac; read -p 'ENTER...'; clear; done
+while true; do
+ menu
+ case "$op" in
+  1) add_host ;;
+  2) prep_nrpe ;;
+  3) client_nrpe ;;
+  4) add_checks ;;
+  5) mail_alert ;;
+  6) time_fix ;;
+  7) verify ;;
+  8) restart_n ;;
+  9) del_host ;;
+  10) cleanup_all ;;
+  11) exit ;;
+  *) echo 'Opción inválida' ;;
+ esac
+ read -p 'ENTER...'
+ clear
+done
