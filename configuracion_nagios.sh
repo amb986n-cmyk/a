@@ -198,7 +198,7 @@ cleanup(){
 }
 
 while true; do
- echo '===== NAGIOS MONITOR PRO V3 ====='
+ echo '===== NAGIOS MONITOR ====='
  echo '1 Añadir host'
  echo '2 Preparar servidor NRPE'
  echo '3 Instalar cliente NRPE SSH'
