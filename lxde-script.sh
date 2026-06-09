@@ -13,7 +13,6 @@ echo "[2/8] Instalando software..."
 
 sudo pacman -S --needed --noconfirm \
     flatpak \
-    discover \
     packagekit-qt6 \
     flatpak-kcm \
     gamemode \
