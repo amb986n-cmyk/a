@@ -2,8 +2,7 @@
 set -e
 
 echo "########################################################"
-echo "#              UNIVERSAL OPTIMIZER ELITE              #"
-echo "#                 FINAL MODE ACTIVATED                #"
+echo "#        UNIVERSAL SYSTEM OPTIMIZER (DEFINITIVO)      #"
 echo "########################################################"
 echo ""
 
@@ -23,65 +22,29 @@ fi
 echo "[✔] Distro: $DISTRO"
 
 # =========================
-# DETECCIÓN HARDWARE BASE
+# PERFIL
 # =========================
 
-echo "[+] Detectando hardware..."
+echo ""
+echo "Perfil:"
+echo "1) performance"
+echo "2) gaming"
+echo "3) battery"
+read -p "> " P
 
-GPU=$(lspci | grep -Ei "vga|3d|display")
-CPU=$(lscpu | grep "Model name" | cut -d: -f2)
+case $P in
+    2) PROFILE="gaming" ;;
+    3) PROFILE="battery" ;;
+    *) PROFILE="performance" ;;
+esac
 
-echo "[GPU] $GPU"
-echo "[CPU] $CPU"
-
-if echo "$GPU" | grep -qi nvidia; then GPU_TYPE="nvidia"
-elif echo "$GPU" | grep -Eqi "amd|radeon"; then GPU_TYPE="amd"
-else GPU_TYPE="intel"
-fi
-
-# =========================
-# LAPTOP / DESKTOP
-# =========================
-
-SYSTEM_TYPE="desktop"
-
-if [ -d /sys/class/power_supply ]; then
-    if ls /sys/class/power_supply | grep -qi bat; then
-        SYSTEM_TYPE="laptop"
-    fi
-fi
-
-echo "[✔] Sistema: $SYSTEM_TYPE"
-
-# =========================
-# SSD / HDD DETECCIÓN
-# =========================
-
-DISK_TYPE="hdd"
-
-if lsblk -d -o rota | grep -q 0; then
-    DISK_TYPE="ssd"
-fi
-
-echo "[✔] Disco: $DISK_TYPE"
-
-# =========================
-# STEAM DETECCIÓN (GAMING MODE AUTO)
-# =========================
-
-STEAM_MODE="off"
-
-if command -v steam >/dev/null 2>&1; then
-    STEAM_MODE="on"
-fi
-
-echo "[✔] Steam: $STEAM_MODE"
+echo "[✔] Perfil: $PROFILE"
 
 # =========================
 # ACTUALIZACIÓN
 # =========================
 
-echo "[1/8] Updating system..."
+echo "[1/7] Updating..."
 
 if [ "$DISTRO" = "arch" ]; then
     sudo pacman -Syu --noconfirm
@@ -93,7 +56,7 @@ fi
 # BASE PACKAGES
 # =========================
 
-echo "[2/8] Installing base..."
+echo "[2/7] Installing base..."
 
 if [ "$DISTRO" = "arch" ]; then
     sudo pacman -S --needed --noconfirm \
@@ -106,13 +69,12 @@ else
 fi
 
 # =========================
-# FLATHUB SMART
+# FLATHUB (SMART)
 # =========================
 
-echo "[3/8] Flatpak..."
+echo "[3/7] Flatpak..."
 
 if command -v flatpak >/dev/null 2>&1; then
-
     if ! flatpak remotes | grep -q flathub; then
         echo "[+] Activando Flathub..."
         flatpak remote-add --if-not-exists flathub \
@@ -123,11 +85,11 @@ if command -v flatpak >/dev/null 2>&1; then
 fi
 
 # =========================
-# AUR SMART
+# AUR (ARCH ONLY)
 # =========================
 
 if [ "$DISTRO" = "arch" ]; then
-    echo "[4/8] AUR..."
+    echo "[4/7] AUR..."
 
     if ! command -v yay >/dev/null 2>&1; then
         echo "[+] Instalando yay..."
@@ -146,10 +108,126 @@ if [ "$DISTRO" = "arch" ]; then
 fi
 
 # =========================
-# GPU DRIVERS
+# GPU DETECTION
 # =========================
 
-echo "[5/8] GPU drivers..."
+echo "[5/7] GPU..."
+
+GPU=$(lspci | grep -Ei "vga|3d|display")
+
+echo "$GPU"
+
+if echo "$GPU" | grep -qi nvidia; then
+    GPU_TYPE="nvidia"
+elif echo "$GPU" | grep -Eqi "amd|radeon"; then
+    GPU_TYPE="amd"
+else
+    GPU_TYPE="intel"
+fi
+
+echo "[✔] GPU: $GPU_TYPE"
+
+# =========================
+# DISCO (FIX DEFINITIVO)
+# =========================
+
+echo "[+] Detectando disco real del sistema..."
+
+ROOT_SRC=$(findmnt -n -o SOURCE /)
+
+# elimina partición (sda1 -> sda, nvme0n1p2 -> nvme0n1)
+ROOT_DISK=$(echo "$ROOT_SRC" | sed -E 's/p?[0-9]+$//')
+
+if [ -e "/sys/block/$(basename "$ROOT_DISK")/queue/rotational" ]; then
+    ROTATIONAL=$(cat /sys/block/$(basename "$ROOT_DISK")/queue/rotational)
+else
+    ROTATIONAL=1
+fi
+
+if [ "$ROTATIONAL" -eq 0 ]; then
+    DISK_TYPE="ssd"
+else
+    DISK_TYPE="hdd"
+fi
+
+echo "[✔] Disco: $ROOT_DISK ($DISK_TYPE)"
+
+# =========================
+# LAPTOP / DESKTOP
+# =========================
+
+SYSTEM_TYPE="desktop"
+
+if [ -d /sys/class/power_supply ]; then
+    ls /sys/class/power_supply | grep -qi bat && SYSTEM_TYPE="laptop"
+fi
+
+echo "[✔] Sistema: $SYSTEM_TYPE"
+
+# =========================
+# ZRAM + SYSCTL
+# =========================
+
+echo "[6/7] Tuning..."
+
+sudo tee /etc/systemd/zram-generator.conf > /dev/null << EOF
+[zram0]
+zram-size = ram / 2
+compression-algorithm = zstd
+EOF
+
+sudo systemctl daemon-reload || true
+
+if [ "$PROFILE" = "gaming" ]; then
+    SWAP=10; CACHE=50
+elif [ "$PROFILE" = "battery" ]; then
+    SWAP=60; CACHE=90
+else
+    SWAP=20; CACHE=70
+fi
+
+sudo tee /etc/sysctl.d/99-optimizer.conf > /dev/null << EOF
+vm.swappiness=$SWAP
+vm.vfs_cache_pressure=$CACHE
+kernel.sched_autogroup_enabled=1
+EOF
+
+# =========================
+# CPU + LAPTOP POWER
+# =========================
+
+echo "[7/7] CPU & power..."
+
+if command -v cpupower >/dev/null 2>&1; then
+
+    GOV="ondemand"
+
+    if [ "$PROFILE" = "gaming" ]; then
+        GOV="performance"
+    elif [ "$PROFILE" = "battery" ]; then
+        GOV="powersave"
+    fi
+
+    sudo tee /etc/default/cpupower > /dev/null << EOF
+governor='$GOV'
+EOF
+
+    sudo systemctl enable cpupower.service || true
+fi
+
+# LAPTOP POWER TOOL
+if [ "$SYSTEM_TYPE" = "laptop" ]; then
+    if [ "$DISTRO" = "arch" ]; then
+        sudo pacman -S --needed --noconfirm tlp tlp-rdw
+    else
+        sudo apt install -y tlp tlp-rdw
+    fi
+    sudo systemctl enable tlp.service || true
+fi
+
+# =========================
+# GPU DRIVERS
+# =========================
 
 if [ "$DISTRO" = "arch" ]; then
     case $GPU_TYPE in
@@ -162,116 +240,19 @@ else
 fi
 
 # =========================
-# ZRAM + SYSCTL (ELITE)
-# =========================
-
-echo "[6/8] System tuning..."
-
-sudo tee /etc/systemd/zram-generator.conf > /dev/null << EOF
-[zram0]
-zram-size = ram / 2
-compression-algorithm = zstd
-EOF
-
-sudo systemctl daemon-reload || true
-
-# tuning dinámico
-if [ "$SYSTEM_TYPE" = "gaming" ]; then
-    SWAP=10; CACHE=50
-elif [ "$SYSTEM_TYPE" = "laptop" ]; then
-    SWAP=40; CACHE=80
-else
-    SWAP=20; CACHE=60
-fi
-
-sudo tee /etc/sysctl.d/99-elite.conf > /dev/null << EOF
-vm.swappiness=$SWAP
-vm.vfs_cache_pressure=$CACHE
-kernel.sched_autogroup_enabled=1
-EOF
-
-# =========================
-# CPU + LAPTOP TLP
-# =========================
-
-echo "[7/8] CPU & power management..."
-
-if command -v cpupower >/dev/null 2>&1; then
-    GOV="ondemand"
-
-    if [ "$SYSTEM_TYPE" = "laptop" ]; then
-        GOV="powersave"
-    fi
-
-    sudo tee /etc/default/cpupower > /dev/null << EOF
-governor='$GOV'
-EOF
-
-    sudo systemctl enable cpupower.service || true
-fi
-
-# TLP solo laptop
-if [ "$SYSTEM_TYPE" = "laptop" ]; then
-    echo "[+] Laptop detected → TLP"
-
-    if [ "$DISTRO" = "arch" ]; then
-        sudo pacman -S --needed --noconfirm tlp tlp-rdw
-    else
-        sudo apt install -y tlp tlp-rdw
-    fi
-
-    sudo systemctl enable tlp.service || true
-fi
-
-# =========================
-# I/O OPTIMIZATION (SSD vs HDD)
-# =========================
-
-echo "[8/8] I/O tuning..."
-
-SCHED="mq-deadline"
-
-if [ "$DISK_TYPE" = "ssd" ]; then
-    SCHED="mq-deadline"
-else
-    SCHED="bfq"
-fi
-
-sudo tee /etc/udev/rules.d/60-ioscheduler.rules > /dev/null << EOF
-ACTION=="add|change", KERNEL=="sd[a-z]|nvme[0-9]*", ATTR{queue/scheduler}="$SCHED"
-EOF
-
-# =========================
-# GAMING BOOST AUTO
-# =========================
-
-if [ "$STEAM_MODE" = "on" ]; then
-    echo "[+] Steam detected → Gaming optimizations active"
-fi
-
-# =========================
-# FASTFETCH
-# =========================
-
-grep -q fastfetch ~/.bashrc 2>/dev/null || echo "fastfetch" >> ~/.bashrc
-
-# =========================
-# FINAL REPORT
+# FINAL
 # =========================
 
 echo ""
 echo "########################################################"
-echo "#                ✔ ELITE OPTIMIZATION DONE            #"
+echo "#                 OPTIMIZACIÓN COMPLETA               #"
 echo "########################################################"
 echo ""
-echo "Distro   : $DISTRO"
-echo "GPU      : $GPU_TYPE"
-echo "System   : $SYSTEM_TYPE"
-echo "Disk     : $DISK_TYPE"
-echo "Steam    : $STEAM_MODE"
+echo "Distro     : $DISTRO"
+echo "Perfil     : $PROFILE"
+echo "GPU        : $GPU_TYPE"
+echo "Disco      : $DISK_TYPE"
+echo "Sistema    : $SYSTEM_TYPE"
 echo ""
-echo "✔ Adaptive tuning applied"
-echo "✔ Laptop/desktop detected"
-echo "✔ SSD/HDD optimized"
-echo "✔ Gaming stack ready"
+echo "✔ Todo optimizado correctamente"
 echo "########################################################"
