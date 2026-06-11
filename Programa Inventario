@@ -3,10 +3,11 @@ using System.Collections.Generic;
 using System.IO;
 using System.Text;
 using System.Text.Json;
+using System.Threading;
 
 class Producto
 {
-    public string Nombre { get; set; }
+    public string Nombre { get; set; } = string.Empty;
     public int Cantidad { get; set; }
     public decimal Precio { get; set; }
     public decimal ValorTotal => Cantidad * Precio;
@@ -33,7 +34,7 @@ class RepositorioProductos
 
         if (OperatingSystem.IsWindows() && File.Exists(ArchivoJSON))
         {
-            File.SetAttributes(ArchivoJSON, FileAttributes.Hidden);
+            try { File.SetAttributes(ArchivoJSON, FileAttributes.Hidden); } catch { }
         }
     }
 
@@ -102,7 +103,7 @@ class RepositorioProductos
         return true;
     }
 
-    public Producto BuscarPorNombre(string nombre)
+    public Producto? BuscarPorNombre(string nombre)
     {
         for (int i = 0; i < _productos.Count; i++)
         {
@@ -205,7 +206,9 @@ class RepositorioProductos
         JsonSerializer.Serialize(fs, _productos, opciones);
 
         if (OperatingSystem.IsWindows())
-            File.SetAttributes(ArchivoJSON, FileAttributes.Hidden);
+        {
+            try { File.SetAttributes(ArchivoJSON, FileAttributes.Hidden); } catch { }
+        }
 
         _cambiosPendientes = false;
     }
@@ -236,6 +239,8 @@ class RepositorioProductos
 
 static class UI
 {
+    private static int AnchoDisponible => Math.Max(80, Console.WindowWidth - 4);
+
     public static void LimpiarPantalla()
     {
         Console.Clear();
@@ -245,15 +250,17 @@ static class UI
     public static void MostrarTitulo(string titulo)
     {
         LimpiarPantalla();
+        int ancho = AnchoDisponible;
+
         Console.ForegroundColor = ConsoleColor.Cyan;
-        Console.WriteLine("╔" + new string('═', 136) + "╗");
-        Console.WriteLine("║" + CentrarTexto("🏪  SISTEMA DE GESTIÓN DE INVENTARIO  🏪", 136) + "║");
-        Console.WriteLine("╚" + new string('═', 136) + "╝");
+        Console.WriteLine("╔" + new string('═', ancho) + "╗");
+        Console.WriteLine("║" + CentrarTexto("SISTEMA DE GESTIÓN DE INVENTARIO", ancho) + "║");
+        Console.WriteLine("╚" + new string('═', ancho) + "╝");
         Console.ResetColor();
         
         Console.ForegroundColor = ConsoleColor.Yellow;
-        Console.WriteLine("\n" + CentrarTexto(titulo, 136));
-        Console.WriteLine(CentrarTexto(new string('═', titulo.Length), 136));
+        Console.WriteLine("\n" + CentrarTexto(titulo, ancho));
+        Console.WriteLine(CentrarTexto(new string('═', titulo.Length), ancho));
         Console.ResetColor();
         Console.WriteLine();
     }
@@ -261,27 +268,32 @@ static class UI
     public static string CentrarTexto(string texto, int ancho)
     {
         int espacios = (ancho - texto.Length) / 2;
-        return new string(' ', Math.Max(0, espacios)) + texto;
+        if (espacios < 0) return texto;
+        
+        string izquierda = new string(' ', espacios);
+        string derecha = new string(' ', ancho - texto.Length - espacios); 
+        
+        return izquierda + texto + derecha;
     }
 
     public static void MensajeOk(string msg)
     {
         Console.ForegroundColor = ConsoleColor.Green;
-        Console.WriteLine($"\n  ✓ {msg}\n");
+        Console.WriteLine($"\n  [OK] {msg}\n");
         Console.ResetColor();
     }
 
     public static void MensajeAviso(string msg)
     {
         Console.ForegroundColor = ConsoleColor.Yellow;
-        Console.WriteLine($"\n  ⚠ {msg}\n");
+        Console.WriteLine($"\n  [AVISO] {msg}\n");
         Console.ResetColor();
     }
 
     public static void MensajeError(string msg)
     {
         Console.ForegroundColor = ConsoleColor.Red;
-        Console.WriteLine($"\n  ✗ {msg}\n");
+        Console.WriteLine($"\n  [ERROR] {msg}\n");
         Console.ResetColor();
     }
 
@@ -290,7 +302,7 @@ static class UI
         while (true)
         {
             Console.ForegroundColor = ConsoleColor.Cyan;
-            Console.Write($"\n  ▶ {etiqueta}: ");
+            Console.Write($"\n  > {etiqueta}: ");
             Console.ResetColor();
             string valor = Console.ReadLine()?.Trim() ?? "";
             if (valor.Length > 0) return valor;
@@ -303,11 +315,11 @@ static class UI
         while (true)
         {
             Console.ForegroundColor = ConsoleColor.Cyan;
-            Console.Write($"\n  ▶ {etiqueta}: ");
+            Console.Write($"\n  > {etiqueta}: ");
             Console.ResetColor();
             if (int.TryParse(Console.ReadLine(), out int v) && v >= 0)
                 return v;
-            MensajeError("Introduce un número entero ≥ 0.");
+            MensajeError("Introduce un número entero >= 0.");
         }
     }
 
@@ -316,11 +328,11 @@ static class UI
         while (true)
         {
             Console.ForegroundColor = ConsoleColor.Cyan;
-            Console.Write($"\n  ▶ {etiqueta}: ");
+            Console.Write($"\n  > {etiqueta}: ");
             Console.ResetColor();
             if (decimal.TryParse(Console.ReadLine(), out decimal v) && v >= 0)
                 return v;
-            MensajeError("Introduce un número decimal ≥ 0.");
+            MensajeError("Introduce un número decimal >= 0.");
         }
     }
 
@@ -329,7 +341,7 @@ static class UI
         while (true)
         {
             Console.ForegroundColor = ConsoleColor.Cyan;
-            Console.Write($"\n  ▶ {etiqueta}: ");
+            Console.Write($"\n  > {etiqueta}: ");
             Console.ResetColor();
             if (int.TryParse(Console.ReadLine(), out int v) && v >= min && v <= max)
                 return v;
@@ -339,9 +351,10 @@ static class UI
 
     public static int SeleccionarProducto(IReadOnlyList<Producto> lista, string accion)
     {
+        int ancho = AnchoDisponible;
         Console.WriteLine($"\n  📋 Selecciona el producto a {accion}:\n");
         Console.ForegroundColor = ConsoleColor.DarkCyan;
-        Console.WriteLine("  " + new string('─', 134));
+        Console.WriteLine("  " + new string('─', ancho));
         
         for (int i = 0; i < lista.Count; i++)
         {
@@ -351,7 +364,7 @@ static class UI
         }
         
         Console.ForegroundColor = ConsoleColor.DarkCyan;
-        Console.WriteLine("  " + new string('─', 134));
+        Console.WriteLine("  " + new string('─', ancho));
         Console.ResetColor();
         Console.WriteLine("      0. Volver");
 
@@ -362,9 +375,14 @@ static class UI
     public static void Pausa()
     {
         Console.ForegroundColor = ConsoleColor.DarkGray;
-        Console.WriteLine("\n  ⏸  Pulsa ENTER para continuar...");
+        Console.WriteLine("\n  Pulsa ENTER para continuar...");
         Console.ResetColor();
         Console.ReadLine();
+    }
+
+    public static void DibujarLineaSeparadora()
+    {
+        Console.WriteLine("  " + new string('═', AnchoDisponible));
     }
 }
 
@@ -386,36 +404,39 @@ class MenuInventario
             UI.MostrarTitulo("MENÚ PRINCIPAL");
 
             Console.ForegroundColor = ConsoleColor.Cyan;
-            Console.WriteLine("  " + new string('═', 134));
+            UI.DibujarLineaSeparadora();
             Console.WriteLine("  │ GESTIÓN DE PRODUCTOS");
-            Console.WriteLine("  " + new string('═', 134));
+            UI.DibujarLineaSeparadora();
             Console.ResetColor();
-            Console.WriteLine("    1. ➕ Añadir producto");
-            Console.WriteLine("    2. ➖ Eliminar producto");
-            Console.WriteLine("    3. ✏️  Modificar producto");
+            Console.WriteLine("    1. Añadir producto");
+            Console.WriteLine("    2. Eliminar producto");
+            Console.WriteLine("    3. Modificar producto");
 
             Console.ForegroundColor = ConsoleColor.Green;
-            Console.WriteLine("\n  " + new string('═', 134));
+            Console.WriteLine();
+            UI.DibujarLineaSeparadora();
             Console.WriteLine("  │ CONSULTAS");
-            Console.WriteLine("  " + new string('═', 134));
+            UI.DibujarLineaSeparadora();
             Console.ResetColor();
-            Console.WriteLine("    4. 📊 Mostrar inventario completo");
-            Console.WriteLine("    5. 🔍 Buscar producto");
+            Console.WriteLine("    4. Mostrar inventario completo");
+            Console.WriteLine("    5. Buscar producto");
 
             Console.ForegroundColor = ConsoleColor.Magenta;
-            Console.WriteLine("\n  " + new string('═', 134));
+            Console.WriteLine();
+            UI.DibujarLineaSeparadora();
             Console.WriteLine("  │ IMPORTAR / EXPORTAR");
-            Console.WriteLine("  " + new string('═', 134));
+            UI.DibujarLineaSeparadora();
             Console.ResetColor();
-            Console.WriteLine("    6. 📤 Exportar inventario a CSV");
-            Console.WriteLine("    7. 📥 Importar inventario desde CSV");
+            Console.WriteLine("    6. Exportar inventario a CSV");
+            Console.WriteLine("    7. Importar inventario desde CSV");
 
             Console.ForegroundColor = ConsoleColor.Yellow;
-            Console.WriteLine("\n  " + new string('═', 134));
+            Console.WriteLine();
+            UI.DibujarLineaSeparadora();
             Console.WriteLine("  │ SISTEMA");
-            Console.WriteLine("  " + new string('═', 134));
+            UI.DibujarLineaSeparadora();
             Console.ResetColor();
-            Console.WriteLine("    8. 🚪 Salir");
+            Console.WriteLine("    8. Salir");
 
             int op = UI.LeerOpcion("Selecciona una opción", 1, 8);
 
@@ -435,7 +456,7 @@ class MenuInventario
 
     private void AñadirProducto()
     {
-        UI.MostrarTitulo("➕ AÑADIR NUEVO PRODUCTO");
+        UI.MostrarTitulo("AÑADIR NUEVO PRODUCTO");
 
         Console.WriteLine("  (Escribe '0' en el nombre para volver)\n");
         string nombre = UI.LeerTexto("Nombre del producto");
@@ -462,7 +483,7 @@ class MenuInventario
 
     private void EliminarProducto()
     {
-        UI.MostrarTitulo("➖ ELIMINAR PRODUCTO");
+        UI.MostrarTitulo("ELIMINAR PRODUCTO");
 
         if (_repo.EstaVacio())
         {
@@ -477,7 +498,7 @@ class MenuInventario
         string nombre = _repo.Productos[idx].Nombre;
 
         Console.ForegroundColor = ConsoleColor.Red;
-        Console.Write($"\n  ⚠️  ¿Seguro que quieres eliminar '{nombre}'? (s/N): ");
+        Console.Write($"\n  ¿Seguro que quieres eliminar '{nombre}'? (s/N): ");
         Console.ResetColor();
         if (!string.Equals(Console.ReadLine()?.Trim(), "s", StringComparison.OrdinalIgnoreCase))
             return;
@@ -489,7 +510,7 @@ class MenuInventario
 
     private void ModificarProducto()
     {
-        UI.MostrarTitulo("✏️  MODIFICAR PRODUCTO");
+        UI.MostrarTitulo("MODIFICAR PRODUCTO");
 
         if (_repo.EstaVacio())
         {
@@ -502,7 +523,8 @@ class MenuInventario
         if (idx == -1) return;
 
         Console.ForegroundColor = ConsoleColor.Cyan;
-        Console.WriteLine("\n  " + new string('═', 134));
+        Console.WriteLine();
+        UI.DibujarLineaSeparadora();
         Console.ResetColor();
         Console.WriteLine("    1. Modificar cantidad");
         Console.WriteLine("    2. Modificar precio");
@@ -534,7 +556,7 @@ class MenuInventario
 
     private void MostrarInventario()
     {
-        UI.MostrarTitulo("📊 INVENTARIO COMPLETO");
+        UI.MostrarTitulo("INVENTARIO COMPLETO");
 
         if (_repo.EstaVacio())
         {
@@ -546,7 +568,7 @@ class MenuInventario
         ImprimirTabla(_repo.Productos);
 
         Console.ForegroundColor = ConsoleColor.Cyan;
-        Console.WriteLine($"\n  💰 Valor total del inventario: ");
+        Console.WriteLine($"\n  Valor total del inventario: ");
         Console.ForegroundColor = ConsoleColor.Yellow;
         Console.WriteLine($"      {_repo.ValorTotalInventario():F2}€\n");
         Console.ResetColor();
@@ -556,7 +578,7 @@ class MenuInventario
 
     private void BuscarProducto()
     {
-        UI.MostrarTitulo("🔍 BUSCAR PRODUCTO");
+        UI.MostrarTitulo("BUSCAR PRODUCTO");
 
         string texto = UI.LeerTexto("Texto a buscar");
         var resultados = _repo.Buscar(texto);
@@ -567,7 +589,7 @@ class MenuInventario
         }
         else
         {
-            Console.WriteLine($"\n  ✓ Se encontraron {resultados.Count} resultado(s):\n");
+            Console.WriteLine($"\n  [OK] Se encontraron {resultados.Count} resultado(s):\n");
             ImprimirTabla(resultados);
         }
 
@@ -576,7 +598,7 @@ class MenuInventario
 
     private void ExportarCSV()
     {
-        UI.MostrarTitulo("📤 EXPORTAR INVENTARIO A CSV");
+        UI.MostrarTitulo("EXPORTAR INVENTARIO A CSV");
 
         if (_repo.EstaVacio())
         {
@@ -589,7 +611,7 @@ class MenuInventario
 
         UI.MensajeOk("Inventario exportado correctamente.");
         Console.ForegroundColor = ConsoleColor.Cyan;
-        Console.WriteLine("  📁 Archivo generado en:");
+        Console.WriteLine("  Archivo generado en:");
         Console.ForegroundColor = ConsoleColor.Yellow;
         Console.WriteLine($"     {ruta}\n");
         Console.ResetColor();
@@ -599,7 +621,7 @@ class MenuInventario
 
     private void ImportarCSV()
     {
-        UI.MostrarTitulo("📥 IMPORTAR INVENTARIO DESDE CSV");
+        UI.MostrarTitulo("IMPORTAR INVENTARIO DESDE CSV");
 
         string archivo = UI.LeerTexto("Ruta del archivo CSV");
         string resultado = _repo.ImportarCSV(archivo);
@@ -615,7 +637,7 @@ class MenuInventario
     private bool Salir()
     {
         Console.ForegroundColor = ConsoleColor.Yellow;
-        Console.Write($"\n  ⚠️  ¿Seguro que quieres salir? (s/N): ");
+        Console.Write($"\n  ¿Seguro que quieres salir? (s/N): ");
         Console.ResetColor();
         if (!string.Equals(Console.ReadLine()?.Trim(), "s", StringComparison.OrdinalIgnoreCase))
             return false;
@@ -623,9 +645,12 @@ class MenuInventario
         Console.Clear();
         Console.ForegroundColor = ConsoleColor.Green;
         Console.WriteLine();
-        Console.WriteLine("╔" + new string('═', 136) + "╗");
-        Console.WriteLine("║" + UI.CentrarTexto("👋 ¡Hasta pronto! Los datos han sido guardados.", 136) + "║");
-        Console.WriteLine("╚" + new string('═', 136) + "╝");
+        
+        int ancho = Math.Max(80, Console.WindowWidth - 4);
+        Console.WriteLine("╔" + new string('═', ancho) + "╗");
+        Console.WriteLine("║" + UI.CentrarTexto("Hasta pronto. Los datos han sido guardados.", ancho) + "║");
+        Console.WriteLine("╚" + new string('═', ancho) + "╝");
+        
         Console.ResetColor();
         Console.WriteLine();
         return true;
@@ -633,10 +658,11 @@ class MenuInventario
 
     private static void ImprimirTabla(IReadOnlyList<Producto> lista)
     {
+        int ancho = Math.Max(80, Console.WindowWidth - 4);
         Console.ForegroundColor = ConsoleColor.Cyan;
-        Console.WriteLine("  " + new string('═', 134));
+        Console.WriteLine("  " + new string('═', ancho));
         Console.WriteLine("  │ {0,-35} │ {1,10} │ {2,12} │ {3,15} │", "NOMBRE", "CANTIDAD", "PRECIO (€)", "TOTAL (€)");
-        Console.WriteLine("  " + new string('═', 134));
+        Console.WriteLine("  " + new string('═', ancho));
         Console.ResetColor();
 
         for (int i = 0; i < lista.Count; i++)
@@ -647,7 +673,7 @@ class MenuInventario
         }
 
         Console.ForegroundColor = ConsoleColor.Cyan;
-        Console.WriteLine("  " + new string('═', 134));
+        Console.WriteLine("  " + new string('═', ancho));
         Console.ResetColor();
     }
 }
@@ -657,17 +683,28 @@ class Program
     static void Main()
     {
         Console.OutputEncoding = Encoding.UTF8;
-        Console.Title = "🏪 Sistema de Gestión de Inventario";
+        Console.Title = "Sistema de Gestión de Inventario";
         
-        // Maximizar ventana
         try
         {
-            Console.WindowWidth = 140;
-            Console.WindowHeight = 40;
-            Console.BufferWidth = 140;
-            Console.BufferHeight = 500;
+            if (OperatingSystem.IsWindows())
+            {
+                Console.WindowWidth = 140;
+                Console.WindowHeight = 40;
+                Console.BufferWidth = 140;
+                Console.BufferHeight = 500;
+            }
+            else
+            {
+                Console.WindowWidth = 140;
+                Console.WindowHeight = 40;
+            }
         }
         catch { }
+
+        Console.Clear();
+        Thread.Sleep(100);
+        Console.Clear();
 
         var repo = new RepositorioProductos();
         var menu = new MenuInventario(repo);
