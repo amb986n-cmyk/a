@@ -1,0 +1,16 @@
+{
+    "amb986n": {
+        "password": "4aea227e3a7f12f4c4e75623e1cc610b00a69879ae0e07135123a9c79a94c486",
+        "rol": "admin",
+        "nombre": "Alejandro",
+        "creado": "2026-08-30T19:04:02.395450",
+        "ultimo_acceso": "2026-08-31T10:25:37.606839"
+    },
+    "eric": {
+        "password": "5994471abb01112afcc18159f6cc74b4f511b99806da59b3caf5a9c173cacfc5",
+        "rol": "visitante",
+        "nombre": "eric",
+        "creado": "2026-08-31T06:58:52.085545",
+        "ultimo_acceso": "2026-08-31T07:31:07.313785"
+    }
+}
